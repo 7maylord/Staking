@@ -1,4 +1,7 @@
-import { ethers } from "hardhat";
+import { ethers, run, network } from "hardhat";
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 async function main() {
     const [deployer] = await ethers.getSigners();
@@ -32,6 +35,31 @@ async function main() {
 
 
     console.log("\nDeployment Completed!");
+
+     // Wait for a few confirmations before verification
+     if (network.name !== "hardhat") {
+        console.log("Waiting for transactions to confirm...");
+        await new Promise((resolve) => setTimeout(resolve, 30000));
+
+        try {
+            console.log("Verifying Staking Token...");
+            await run("verify:verify", {
+                address: stakingTokenAddress,
+                constructorArguments: [tokenName, tokenSymbol, initialSupply],
+            });
+            console.log("✅ Staking Token verified successfully!");
+
+            console.log("Verifying Staking Contract...");
+            await run("verify:verify", {
+                address: stakingAddress,
+                constructorArguments: [stakingTokenAddress, rewardRate, minStakingTime],
+            });
+            console.log("✅ Staking Contract verified successfully!");
+        } catch (error) {
+            console.error("Verification failed:", error);
+        }
+
+    }
 }
 
 // Run the script

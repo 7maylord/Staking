@@ -14,6 +14,7 @@ contract StakingContract is ReentrancyGuard, Ownable {
     uint256 public immutable rewardRate;
     uint256 public immutable minStakingTime;
     uint256 public totalSupply;
+    uint256 public rewardPool;
 
     struct StakeInfo {
         uint256 amount;
@@ -23,7 +24,8 @@ contract StakingContract is ReentrancyGuard, Ownable {
     mapping(address => StakeInfo) private stakes;
     
     event Staked(address indexed user, uint256 amount, uint256 timestamp);
-    event Withdrawn(address indexed user, uint256 amount, uint256 reward);
+    event Withdrawn(address indexed user, uint256 amount, uint256 reward);    
+    event RewardDeposited(uint256 amount);
 
     error InsufficientStake(uint256 amount);
     error MinimumStakingTimeNotReached();
@@ -61,10 +63,14 @@ contract StakingContract is ReentrancyGuard, Ownable {
         uint256 reward = calculateReward(msg.sender);
         uint256 totalAmount = stakedAmount + reward;
         
-        
-        require(stakingToken.balanceOf(address(this)) >= totalAmount, "Insufficient balance");
+        if (reward > rewardPool) revert InsufficientBalance();
 
-        delete stakes[msg.sender];
+      // Reset user stake 
+        stakeInfo.amount = 0;
+        stakeInfo.startTime = 0;
+
+        totalSupply -= stakedAmount;
+        rewardPool -= reward;
 
         emit Withdrawn(msg.sender, stakedAmount, reward);
 
@@ -80,6 +86,12 @@ contract StakingContract is ReentrancyGuard, Ownable {
         uint256 stakingDuration = block.timestamp - stakeInfo.startTime;
         uint256 _reward = (stakeInfo.amount * stakingDuration * rewardRate) / 1e18;
         return _reward;
+    }
+
+    function depositRewards(uint256 amount) external onlyOwner {
+        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+        rewardPool += amount;
+        emit RewardDeposited(amount);
     }
 
     // Function to check contract's token balance
